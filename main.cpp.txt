@@ -1,0 +1,203 @@
+#include <iostream.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#define NUM_GRIDS 1000
+#define TOTALSTEP 10
+// units nm and s, concentrations in wt%
+
+double delta_x, conc[NUM_GRIDS], conv[NUM_GRIDS], conv2[NUM_GRIDS], conc_film, conc_ini;
+double buffc[NUM_GRIDS], total_dist, diff_film, diff_sub;
+double run_duration, deltat, timesteps, Kpart, film_thick, w;
+char element[2];
+int interval;
+int main (void)
+{
+		void speicher(int, double, int, int);
+		void gnuplt1(int);
+		
+		int j, k, film_grids, counter, index, sigma;
+		unsigned long int i;
+		
+		total_dist=2000; delta_x=(total_dist)/NUM_GRIDS;
+		//Input of film thickness
+		//printf("Film thickness (nm):  "); scanf("%lG",&film_thick);
+	sprintf(element,"Sm");
+	Kpart=1.0;
+	sigma=5;
+	w=2;	
+		film_thick=140+w;
+		film_grids=int(film_thick/delta_x);
+		
+		//Input of total time and run number
+//		printf("Total time (minutes):  "); scanf("%lG",&run_duration);
+	run_duration=18822;
+		printf("\n Run number:  "); scanf("%i",&index);
+		
+		run_duration=run_duration*60;
+		
+		//definition of initial concentrations
+//		printf("Iniital concentration in the film (wt%):  "); scanf("%lG",&conc_film);
+	conc_film=18000;
+		conc_ini=2;
+		
+		for(k=0;k<film_grids;k++)
+		{
+			conc[k]=conc_film;
+		}
+		for(k=film_thick;k<NUM_GRIDS;k++)
+		{
+			conc[k]=conc_ini;
+		}
+		
+		//initialization of diffusion coefficients
+//		printf("D film (nm^2/s)  "); scanf("%lG",&diff_film);
+//		printf("D sub (nm^2/s)  "); scanf("%lG",&diff_sub);
+//		printf("K part  "); scanf("%lG",&Kpart);
+	diff_film=0.0002;
+	diff_sub=0.0002;
+	interval=int(4*sigma/delta_x);
+	printf("\n interval: %i", interval);
+		
+		//calculation of grid sizes for a stable algorithm and number of timesteps
+	if(diff_sub>diff_film)
+		deltat = 0.45*(delta_x*delta_x)/diff_sub;
+	else
+		deltat = 0.45*(delta_x*delta_x)/diff_film;
+		printf("\n delta_t: %lG", deltat);
+        timesteps = run_duration/deltat;
+		printf("\n timesteps: %lG",timesteps);
+	
+	for(k=0;k<interval-1;k++)
+	{
+		buffc[k]=0.0;
+	}
+	for(k=interval;k<NUM_GRIDS-1;k++)
+	{
+		buffc[k]=conc[k-interval];
+	}
+	for(k=0;k<NUM_GRIDS-2*interval;k++)
+	{
+		conv[k+interval]=buffc[k]*exp(-(interval*delta_x)*(interval*delta_x)/2/(sigma*sigma)/2)+buffc[k+2*interval]*exp(-(interval*delta_x)*(interval*delta_x)/2/(sigma*sigma))/2;
+		for(j=1;j<2*interval;j++)
+		{
+			conv[k+interval]=conv[k+interval]+buffc[k+j]*exp(-((interval*delta_x)-(j*delta_x))*((interval*delta_x)-(j*delta_x))/2/(sigma*sigma));
+		}
+		conv[k+interval]=conv[k+interval]*delta_x/sigma/sqrt(2*3.141592653589793);
+	}
+
+	for(k=interval;k<NUM_GRIDS-2*interval;k++)
+	{
+		conv2[k]=conv[k+int(w/delta_x)]*exp((k-interval)*delta_x/w)/2+conv[interval+int(w/delta_x)]/2;
+		for(j=interval;j<k;j++)
+		{
+			conv2[k]=conv2[k]+conv[k+int(w/delta_x)]*exp((j-interval)*delta_x/w);
+		}
+		conv2[k]=(conv2[k]+conv[interval])*exp(-(k-interval)*delta_x/w)*delta_x/w;
+	}
+	counter=0; speicher(NUM_GRIDS,(i*deltat)/3600, counter, index); counter++;
+		for(i=0;i<timesteps;i++)
+		{
+//			printf("\n delta_x: %lG", delta_x);
+			for(k=0;k<NUM_GRIDS;k++)
+			{
+				buffc[k]=conc[k];
+			}
+			
+			for(k=1;k<film_grids;k++)
+			{
+				conc[k]=buffc[k]+diff_film*deltat/(delta_x*delta_x)*(buffc[k+1]-2.0*buffc[k]+buffc[k-1]);
+			}
+			conc[0]=(48*conc[1]-36*conc[2]+16*conc[3]-3*conc[4])/25;
+/*			conc[film_grids+1]=diff_sub*(48*conc[film_grids+2]-36*conc[film_grids+3]+16*conc[film_grids+4]-3*conc[film_grids+5]);
+			conc[film_grids+1]=(conc[film_grids+1]+diff_film*(48*conc[film_grids-1]-36*conc[film_grids-2]+16*conc[film_grids-3]-3*conc[film_grids-4]))/25/(diff_film/Kpart+diff_sub);
+ */
+			conc[film_grids+1]=(diff_sub*conc[film_grids+2]+diff_film*conc[film_grids-1])/(diff_film/Kpart+diff_sub);
+			conc[film_grids]=1/Kpart*conc[film_grids+1];
+
+			for(k=film_grids+2;k<NUM_GRIDS-1;k++)
+			{
+				conc[k]=buffc[k]+diff_sub*deltat/(delta_x*delta_x)*(buffc[k+1]-2.0*buffc[k]+buffc[k-1]);
+			}
+			if(i>counter*(timesteps/TOTALSTEP))
+			{
+				for(k=0;k<interval-1;k++)
+				{
+					buffc[k]=0.0;
+				}
+				for(k=interval;k<NUM_GRIDS-1;k++)
+				{
+					buffc[k]=conc[k-interval];
+				}
+				for(k=0;k<NUM_GRIDS-2*interval;k++)
+				{
+					conv[k+interval]=buffc[k]*exp(-(interval*delta_x)*(interval*delta_x)/2/(sigma*sigma)/2)+buffc[k+2*interval]*exp(-(interval*delta_x)*(interval*delta_x)/2/(sigma*sigma))/2;
+					for(j=1;j<2*interval;j++)
+					{
+						conv[k+interval]=conv[k+interval]+buffc[k+j]*exp(-((interval*delta_x)-(j*delta_x))*((interval*delta_x)-(j*delta_x))/2/(sigma*sigma));
+					}
+					conv[k+interval]=conv[k+interval]*delta_x/sigma/sqrt(2*3.141592653589793);
+				}
+				
+				for(k=interval;k<NUM_GRIDS-2*interval;k++)
+				{
+					conv2[k]=conv[k+int(w/delta_x)]*exp((k-interval)*delta_x/w)/2+conv[interval+int(w/delta_x)]/2;
+					for(j=interval;j<k;j++)
+					{
+						conv2[k]=conv2[k]+conv[k+int(w/delta_x)]*exp((j-interval)*delta_x/w);
+					}
+					conv2[k]=(conv2[k]+conv[interval])*exp(-(k-interval)*delta_x/w)*delta_x/w;
+				}
+								
+				speicher(NUM_GRIDS,(i*deltat)/3600, counter, index);
+				counter++;
+			}
+		}
+		speicher(NUM_GRIDS,run_duration/3600,counter,index);
+		gnuplt1(index);
+	return(0);
+}
+	
+	//subroutine to write concentration profiles into a file
+	void speicher(int zeilen, double rtime, int step,int index)
+	{
+		FILE * dateizeiger;
+		char name[160];
+		int i;
+		
+		sprintf(name,"/Users/dixons/Documents/Projekte/Diffusion\ \ in\ Rutile/Profile\ fitting/d%s%i_%i.prn", element, index, step);
+		dateizeiger=fopen(name,"w");
+		//	fprintf(dateizeiger,"%lg \t %lg \t %lg \t %lg \t %lg", rtime, diff_mg24/diff_mg26,diff_mg24, gamma);
+		for(i=0;i<zeilen-interval;i++)
+        {
+			if(conv2[i]>0)
+				rtime=log10(conv2[i]);
+			else rtime=-30;
+			fprintf(dateizeiger,"%lg \t %lg \t %lg \t %lg \t %lg \n", (i-interval)*delta_x, conv[i], rtime, conv2[i], buffc[i]);
+		}
+		fclose(dateizeiger);
+	}
+	
+	void gnuplt1(int index)
+	{
+		FILE * dateizeiger;
+		char name[160];
+		int i;
+		
+		sprintf(name,"/Users/dixons/Documents/Projekte/Diffusion\ \ in\ Rutile/Profile\ fitting/pr%s_%i.gp", element, index);
+		dateizeiger=fopen(name,"w");
+		
+		//	fprintf(dateizeiger,"set terminal pdf \n"); \"RuTaNbSm4preann Nb dat.txt\" using 1:2 with points pointtype 2 pointsize 1 title \"data\", 
+		//	fprintf(dateizeiger,"set output \"deltaMg plot %i.pdf\" \n", index);
+//		fprintf(dateizeiger,"set logscale y \n");
+		fprintf(dateizeiger,"set xlabel \"Distance in nm\" font \"Helvetica, 14\" \n");
+		fprintf(dateizeiger,"set ylabel \"Conc in wt%\" font \"Helvetica, 14\" \n");
+		//	fprintf(dateizeiger,"set title \"k IV = %lg mm/s; DMg III/DMg IV = %lg; beta = %lg\" font \"Helvetica, 12\" \n", gamma, diff_mg24, beta);
+		fprintf(dateizeiger,"set key bottom right \n");
+		fprintf(dateizeiger,"plot [0:1800] [0:5] \"Rt19dlog.txt\" using 1:6 with points pointtype 2 pointsize 1 title \"data\", \"d%s%i_0.prn\" using ($1):($3) with lines title \"initial\"", element, index);
+/*		for(i=1;i<TOTALSTEP+1;i++)
+			fprintf(dateizeiger,", \"dNb%i_%i.prn\" using ($1):($3) with lines title \"%lg h\"",index, i, (float(i)/TOTALSTEP*run_duration)/3600);*/
+		fprintf(dateizeiger,", \"d%s%i_10.prn\" using ($1):($3) with lines title \"%lg h\"",element, index, i, (float(i)/TOTALSTEP*run_duration)/3600);
+		//	fprintf(dateizeiger,", \"dif_%i_%i.prn\" using ($1):($6) with lines title \"%lg a\"",index, 0, (run_duration)/(365.*24.*3600.));
+		fclose(dateizeiger);
+	}
